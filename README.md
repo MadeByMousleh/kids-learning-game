@@ -1,8 +1,8 @@
 # Look & Name
 
-Picture vocabulary app in the [kids-learning-game](https://github.com/MadeByMousleh/kids-learning-game) repo.
+Picture vocabulary game.
 
-The first game is Everyday Objects: look at a picture, hear its name, then find it among choices. Names use the device’s built-in voice.
+Play loop: three new words (look + hear), then a short quiz of those three. Parent recordings override the device voice and stay on the device. Hold the top-right corner to open the grown-up settings.
 
 ```bash
 npm install
