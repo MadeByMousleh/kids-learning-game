@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-rounded, system-ui, sans-serif;
+  --color-bg: #fff4e6;
+  --color-ink: #2c2416;
+  --color-muted: #8a7560;
+  --color-card: #fffdf8;
+  --color-line: #ead9c4;
+  --color-coral: #e85d4c;
+  --color-coral-ink: #fff7f4;
+  --color-leaf: #2f8f6b;
+  --color-leaf-ink: #f3fff8;
+  --color-sun: #f0b429;
+  --color-sun-ink: #3a2a08;
+  --radius-card: 1.75rem;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    min-height: 100%;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
