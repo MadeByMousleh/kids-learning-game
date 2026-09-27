@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EVERYDAY_OBJECTS } from "@/lib/objects";
 import { deleteRecording, listRecordedIds, saveRecording } from "@/lib/recordings";
 import { hydrateSettings, useSettings } from "@/lib/settings";
@@ -11,6 +11,7 @@ export function GrownUpCorner() {
   const [customName, setCustomName] = useState("");
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<string[]>([]);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const languages = useSettings((state) => state.languages);
   const languageId = useSettings((state) => state.languageId);
   const showWord = useSettings((state) => state.showWord);
@@ -38,19 +39,32 @@ export function GrownUpCorner() {
     setHold(null);
   }
 
+  function stopRecording() {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state === "recording") recorder.stop();
+  }
+
   async function recordWord(wordId: string) {
+    if (recordingId === wordId) {
+      stopRecording();
+      return;
+    }
+    if (recordingId) stopRecording();
     if (!navigator.mediaDevices?.getUserMedia) return;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const chunks: BlobPart[] = [];
     const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
     const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recorderRef.current = recorder;
     setRecordingId(wordId);
     recorder.ondataavailable = (event) => {
       if (event.data.size) chunks.push(event.data);
     };
     recorder.onstop = async () => {
       stream.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
       setRecordingId(null);
+      if (!chunks.length) return;
       const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
       await saveRecording(languageId, wordId, blob);
       setRecorded(await listRecordedIds(languageId));
@@ -58,19 +72,21 @@ export function GrownUpCorner() {
     recorder.start();
     window.setTimeout(() => {
       if (recorder.state === "recording") recorder.stop();
-    }, 1800);
+    }, 4000);
   }
 
   if (!open) {
     return (
       <button
         type="button"
-        aria-label="Grown-up settings"
+        aria-label="Grown-up settings. Hold to open."
         onPointerDown={startHold}
         onPointerUp={endHold}
         onPointerLeave={endHold}
-        className="fixed right-0 top-0 z-20 h-16 w-16 opacity-0"
-      />
+        className="fixed right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-full text-lg text-ink/25"
+      >
+        🔒
+      </button>
     );
   }
 
@@ -84,7 +100,9 @@ export function GrownUpCorner() {
           </button>
         </div>
 
-        <p className="mt-2 text-sm font-semibold text-muted">Recordings stay on this device. Kids only see pictures.</p>
+        <p className="mt-2 text-sm font-semibold text-muted">
+          Hold the lock to open this. Recordings stay on this device.
+        </p>
 
         <h3 className="mt-5 text-sm font-extrabold uppercase tracking-widest text-muted">Language</h3>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -128,14 +146,16 @@ export function GrownUpCorner() {
         </label>
 
         <h3 className="mt-5 text-sm font-extrabold uppercase tracking-widest text-muted">Your voice</h3>
+        <p className="text-sm font-semibold text-muted">Tap Record, say the word, tap Stop. Max 4 seconds.</p>
         <ul className="mt-2 grid gap-2">
           {EVERYDAY_OBJECTS.map((item) => {
             const hasClip = recorded.includes(item.id);
+            const live = recordingId === item.id;
             return (
               <li key={item.id} className="flex items-center gap-2 rounded-2xl bg-bg px-3 py-2">
                 <img src={item.image} alt="" className="h-12 w-12 rounded-xl object-cover" />
                 <span className="flex-1 font-extrabold capitalize">{item.name}</span>
-                {hasClip ? <span className="text-xs font-extrabold text-leaf">Saved</span> : null}
+                {hasClip && !live ? <span className="text-xs font-extrabold text-leaf">Saved</span> : null}
                 <button
                   type="button"
                   onClick={() => void playWord(item.id, item.name)}
@@ -147,10 +167,10 @@ export function GrownUpCorner() {
                   type="button"
                   onClick={() => void recordWord(item.id)}
                   className={`min-h-10 rounded-full px-3 text-sm font-extrabold ${
-                    recordingId === item.id ? "bg-coral text-coral-ink" : "bg-sun text-sun-ink"
+                    live ? "bg-coral text-coral-ink" : "bg-sun text-sun-ink"
                   }`}
                 >
-                  {recordingId === item.id ? "..." : hasClip ? "Redo" : "Record"}
+                  {live ? "Stop" : hasClip ? "Redo" : "Record"}
                 </button>
                 {hasClip ? (
                   <button
