@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { asEveryday, hydrateCustomObjects, useCustomObjects } from "@/lib/custom-objects";
 import { EVERYDAY_OBJECTS } from "@/lib/objects";
-import { deleteRecording, listRecordedIds, saveRecording } from "@/lib/recordings";
+import { clipPeak, deleteRecording, listRecordedIds, playClip, saveRecording } from "@/lib/recordings";
 import { hydrateSettings, useSettings } from "@/lib/settings";
 import { useProgress } from "@/lib/progress";
-import { playWord } from "@/lib/play-word";
 
 export function GrownUpCorner() {
   const [open, setOpen] = useState(false);
-  const [hold, setHold] = useState<number | null>(null);
   const [customName, setCustomName] = useState("");
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<string[]>([]);
+  const [status, setStatus] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const languages = useSettings((state) => state.languages);
   const languageId = useSettings((state) => state.languageId);
@@ -18,26 +18,19 @@ export function GrownUpCorner() {
   const setLanguage = useSettings((state) => state.setLanguage);
   const setShowWord = useSettings((state) => state.setShowWord);
   const addLanguage = useSettings((state) => state.addLanguage);
+  const custom = useCustomObjects((state) => state.items);
+  const words = [...EVERYDAY_OBJECTS, ...custom.map(asEveryday)];
   const reset = useProgress((state) => state.reset);
   const bumpReset = useSettings((state) => state.bumpReset);
 
   useEffect(() => {
     hydrateSettings();
+    hydrateCustomObjects();
   }, []);
 
   useEffect(() => {
     void listRecordedIds(languageId).then(setRecorded);
   }, [languageId, open]);
-
-  function startHold() {
-    const id = window.setTimeout(() => setOpen(true), 850);
-    setHold(id);
-  }
-
-  function endHold() {
-    if (hold) window.clearTimeout(hold);
-    setHold(null);
-  }
 
   function stopRecording() {
     const recorder = recorderRef.current;
@@ -50,42 +43,97 @@ export function GrownUpCorner() {
       return;
     }
     if (recordingId) stopRecording();
-    if (!navigator.mediaDevices?.getUserMedia) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const chunks: BlobPart[] = [];
-    const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
-    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    recorderRef.current = recorder;
-    setRecordingId(wordId);
-    recorder.ondataavailable = (event) => {
-      if (event.data.size) chunks.push(event.data);
-    };
-    recorder.onstop = async () => {
-      stream.getTracks().forEach((track) => track.stop());
-      recorderRef.current = null;
+    setStatus("Asking for the microphone…");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        throw new Error("This browser cannot record here.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: BlobPart[] = [];
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      recorderRef.current = recorder;
+      setRecordingId(wordId);
+      setStatus("Recording. Speak now, then tap Stop.");
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        recorderRef.current = null;
+        setRecordingId(null);
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        if (!blob.size) {
+          setStatus("Nothing was captured.");
+          return;
+        }
+        void (async () => {
+          let peak = 1;
+          try {
+            peak = await clipPeak(blob);
+          } catch {
+            peak = 1;
+          }
+          if (peak < 0.01) {
+            setStatus("The microphone recording is silent, so there is nothing to play. Allow the mic in the address bar and record again.");
+            return;
+          }
+          const audio = new Audio(URL.createObjectURL(blob));
+          audio.volume = 1;
+          try {
+            await audio.play();
+            setStatus("Playing your voice.");
+          } catch (error) {
+            setStatus(`Playback was blocked: ${error instanceof Error ? error.message : "unknown error"}`);
+          }
+          try {
+            await saveRecording(languageId, wordId, blob);
+            setRecorded(await listRecordedIds(languageId));
+          } catch (error) {
+            setStatus(`Could not store it: ${error instanceof Error ? error.message : "storage error"}`);
+          }
+        })();
+      };
+      recorder.start();
+      window.setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, 4000);
+    } catch (error) {
       setRecordingId(null);
-      if (!chunks.length) return;
-      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-      await saveRecording(languageId, wordId, blob);
+      const message = error instanceof Error ? error.message : "Could not start the microphone.";
+      const blocked = /denied|not allowed|permission|policy/i.test(message);
+      setStatus(
+        blocked
+          ? "The preview blocked the microphone. Tap Open in a new tab, allow the mic, then record."
+          : message,
+      );
+    }
+  }
+
+  async function saveChosenFile(wordId: string, file: File | undefined) {
+    if (!file) return;
+    try {
+      await saveRecording(languageId, wordId, file);
       setRecorded(await listRecordedIds(languageId));
-    };
-    recorder.start();
-    window.setTimeout(() => {
-      if (recorder.state === "recording") recorder.stop();
-    }, 4000);
+      const audio = new Audio(URL.createObjectURL(file));
+      audio.volume = 1;
+      await audio.play();
+      setStatus(`Playing the file for ${wordId}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save.";
+      setStatus(`Not saved. ${message}`);
+    }
   }
 
   if (!open) {
     return (
       <button
         type="button"
-        aria-label="Grown-up settings. Hold to open."
-        onPointerDown={startHold}
-        onPointerUp={endHold}
-        onPointerLeave={endHold}
-        className="fixed right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-full text-lg text-ink/25"
+        aria-label="Record your voice"
+        onClick={() => setOpen(true)}
+        className="fixed right-4 top-4 z-20 min-h-12 rounded-full border border-line bg-card/95 px-5 text-base font-extrabold text-ink shadow-sm backdrop-blur"
       >
-        🔒
+        Voice
       </button>
     );
   }
@@ -100,9 +148,7 @@ export function GrownUpCorner() {
           </button>
         </div>
 
-        <p className="mt-2 text-sm font-semibold text-muted">
-          Hold the lock to open this. Recordings stay on this device.
-        </p>
+        <p className="mt-2 text-sm font-semibold text-muted">Recordings stay on this device.</p>
 
         <h3 className="mt-5 text-sm font-extrabold uppercase tracking-widest text-muted">Language</h3>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -146,9 +192,17 @@ export function GrownUpCorner() {
         </label>
 
         <h3 className="mt-5 text-sm font-extrabold uppercase tracking-widest text-muted">Your voice</h3>
-        <p className="text-sm font-semibold text-muted">Tap Record, say the word, tap Stop. Max 4 seconds.</p>
+        <p className="text-sm font-semibold text-muted">Tap Record, say the word, tap Stop. It plays back immediately.</p>
+        {status ? <p className="mt-2 rounded-2xl bg-sun px-3 py-2 text-sm font-extrabold text-sun-ink">{status}</p> : null}
+        <button
+          type="button"
+          onClick={() => window.open(window.location.href, "_blank", "noopener")}
+          className="mt-2 min-h-11 rounded-full bg-bg px-4 text-sm font-extrabold"
+        >
+          Open in a new tab to use the mic
+        </button>
         <ul className="mt-2 grid gap-2">
-          {EVERYDAY_OBJECTS.map((item) => {
+          {words.map((item) => {
             const hasClip = recorded.includes(item.id);
             const live = recordingId === item.id;
             return (
@@ -158,7 +212,13 @@ export function GrownUpCorner() {
                 {hasClip && !live ? <span className="text-xs font-extrabold text-leaf">Saved</span> : null}
                 <button
                   type="button"
-                  onClick={() => void playWord(item.id, item.name)}
+                  onClick={() => {
+                    void playClip(languageId, item.id).then((result) => {
+                      if (result === "played") setStatus(`Playing your recording of ${item.name}.`);
+                      else if (result === "missing") setStatus("Nothing is saved for this word yet.");
+                      else setStatus("The clip is saved, but playback was blocked.");
+                    });
+                  }}
                   className="min-h-10 rounded-full bg-card px-3 text-sm font-extrabold"
                 >
                   Play
@@ -172,6 +232,19 @@ export function GrownUpCorner() {
                 >
                   {live ? "Stop" : hasClip ? "Redo" : "Record"}
                 </button>
+                <label className="min-h-10 cursor-pointer rounded-full bg-card px-3 py-2 text-sm font-extrabold">
+                  File
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      void saveChosenFile(item.id, file);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
                 {hasClip ? (
                   <button
                     type="button"

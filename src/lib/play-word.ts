@@ -1,9 +1,10 @@
-import { playRecording } from "./recordings";
+import { playClip } from "./recordings";
 import { currentLanguage } from "./settings";
 import { speak } from "./speech";
 
-export async function playWord(wordId: string, spoken: string) {
+export function playWord(wordId: string, spoken: string) {
   const language = currentLanguage();
-  const played = await playRecording(language.id, wordId);
-  if (!played) speak(spoken, language.speechLang);
+  void playClip(language.id, wordId).then((result) => {
+    if (result !== "played") speak(spoken, language.speechLang);
+  });
 }

@@ -19,15 +19,48 @@
 @layer base {
   html,
   body {
-    background: var(--color-bg);
+    background:
+      radial-gradient(900px 420px at 0% -10%, #ffe3c4 0%, transparent 60%),
+      radial-gradient(700px 380px at 100% 0%, #ffd5cc 0%, transparent 55%),
+      var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
     min-height: 100%;
+    overscroll-behavior: none;
   }
 
-  button:not(:disabled),
-  [role="button"]:not(:disabled) {
-    cursor: pointer;
+  button,
+  a,
+  [role="button"],
+  label {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @keyframes drift-a {
+    50% {
+      transform: translate(18px, 36px) rotate(6deg);
+    }
+  }
+  @keyframes drift-b {
+    50% {
+      transform: translate(-28px, 22px) rotate(-8deg);
+    }
+  }
+  @keyframes drift-c {
+    50% {
+      transform: translate(10px, -30px) rotate(4deg);
+    }
+  }
+
+  .drift-a {
+    animation: drift-a 3.2s ease-in-out infinite;
+  }
+  .drift-b {
+    animation: drift-b 3.8s ease-in-out infinite;
+  }
+  .drift-c {
+    animation: drift-c 2.8s ease-in-out infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {

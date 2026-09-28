@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { asEveryday, useCustomObjects } from "./custom-objects";
 import { EVERYDAY_OBJECTS } from "./objects";
 
 const KEY = "look-and-name-progress";
@@ -82,12 +83,19 @@ export function hydrateProgress() {
 
 export function pickRound(count = 3) {
   const scores = useProgress.getState().scores;
-  const ranked = EVERYDAY_OBJECTS.map((item) => {
+  const weight = (item: { id: string }) => {
     const score = scores[item.id] ?? emptyScore();
     const freshness = score.seen === 0 ? 8 : Math.max(0, 4 - score.correct);
-    const weight = 1 + score.miss * 3 + freshness;
-    return { item, weight };
-  }).sort((a, b) => b.weight - a.weight);
-  const chosen = ranked.slice(0, Math.min(count, ranked.length)).map((entry) => entry.item);
-  return chosen.sort(() => Math.random() - 0.5);
+    return 1 + score.miss * 3 + freshness;
+  };
+  const saved = useCustomObjects
+    .getState()
+    .items.map(asEveryday)
+    .sort((a, b) => weight(b) - weight(a))
+    .slice(0, count);
+  const savedIds = new Set(saved.map((item) => item.id));
+  const others = EVERYDAY_OBJECTS.filter((item) => !savedIds.has(item.id))
+    .sort((a, b) => weight(b) - weight(a))
+    .slice(0, Math.max(0, count - saved.length));
+  return [...saved, ...others].sort(() => Math.random() - 0.5);
 }

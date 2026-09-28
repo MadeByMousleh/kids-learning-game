@@ -10,11 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CatchRouteImport } from './routes/catch'
+import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as ObjectsRouteImport } from './routes/objects'
+import { Route as PaintRouteImport } from './routes/paint'
+import { Route as PancakesRouteImport } from './routes/pancakes'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CatchRoute = CatchRouteImport.update({
+  id: '/catch',
+  path: '/catch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemoryRoute = MemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ObjectsRoute = ObjectsRouteImport.update({
@@ -22,31 +36,64 @@ const ObjectsRoute = ObjectsRouteImport.update({
   path: '/objects',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaintRoute = PaintRouteImport.update({
+  id: '/paint',
+  path: '/paint',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PancakesRoute = PancakesRouteImport.update({
+  id: '/pancakes',
+  path: '/pancakes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/catch': typeof CatchRoute
+  '/memory': typeof MemoryRoute
   '/objects': typeof ObjectsRoute
+  '/paint': typeof PaintRoute
+  '/pancakes': typeof PancakesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/catch': typeof CatchRoute
+  '/memory': typeof MemoryRoute
   '/objects': typeof ObjectsRoute
+  '/paint': typeof PaintRoute
+  '/pancakes': typeof PancakesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/catch': typeof CatchRoute
+  '/memory': typeof MemoryRoute
   '/objects': typeof ObjectsRoute
+  '/paint': typeof PaintRoute
+  '/pancakes': typeof PancakesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/objects'
+  fullPaths: '/' | '/catch' | '/memory' | '/objects' | '/paint' | '/pancakes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/objects'
-  id: '__root__' | '/' | '/objects'
+  to: '/' | '/catch' | '/memory' | '/objects' | '/paint' | '/pancakes'
+  id:
+    | '__root__'
+    | '/'
+    | '/catch'
+    | '/memory'
+    | '/objects'
+    | '/paint'
+    | '/pancakes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CatchRoute: typeof CatchRoute
+  MemoryRoute: typeof MemoryRoute
   ObjectsRoute: typeof ObjectsRoute
+  PaintRoute: typeof PaintRoute
+  PancakesRoute: typeof PancakesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +105,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/catch': {
+      id: '/catch'
+      path: '/catch'
+      fullPath: '/catch'
+      preLoaderRoute: typeof CatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memory': {
+      id: '/memory'
+      path: '/memory'
+      fullPath: '/memory'
+      preLoaderRoute: typeof MemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/objects': {
       id: '/objects'
       path: '/objects'
@@ -65,12 +126,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ObjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/paint': {
+      id: '/paint'
+      path: '/paint'
+      fullPath: '/paint'
+      preLoaderRoute: typeof PaintRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pancakes': {
+      id: '/pancakes'
+      path: '/pancakes'
+      fullPath: '/pancakes'
+      preLoaderRoute: typeof PancakesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CatchRoute: CatchRoute,
+  MemoryRoute: MemoryRoute,
   ObjectsRoute: ObjectsRoute,
+  PaintRoute: PaintRoute,
+  PancakesRoute: PancakesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

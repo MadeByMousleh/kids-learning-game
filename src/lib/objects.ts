@@ -29,9 +29,9 @@ export function shuffle<T>(items: T[]): T[] {
   return next;
 }
 
-export function choicesFor(targetId: string): EverydayObject[] {
-  const target = EVERYDAY_OBJECTS.find((item) => item.id === targetId);
-  if (!target) return EVERYDAY_OBJECTS.slice(0, 3);
-  const others = shuffle(EVERYDAY_OBJECTS.filter((item) => item.id !== targetId)).slice(0, 2);
+export function choicesFor(targetId: string, pool: EverydayObject[] = EVERYDAY_OBJECTS): EverydayObject[] {
+  const target = pool.find((item) => item.id === targetId);
+  if (!target) return pool.slice(0, 3);
+  const others = shuffle(pool.filter((item) => item.id !== targetId)).slice(0, 2);
   return shuffle([target, ...others]);
 }
